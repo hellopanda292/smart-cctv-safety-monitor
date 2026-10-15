@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart CCTV Safety Monitor · Priyanshu Zihowa</title>
+  <meta name="description" content="Privacy-first smart CCTV in the browser: detects people, tracks them, and raises alerts for restricted zones, loitering and crowding. Video never leaves your device." />
+  <meta name="theme-color" content="#f6f7fc" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232b59ff'/%3E%3Cstop offset='1' stop-color='%23d63c8f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ccircle cx='32' cy='32' r='12' fill='none' stroke='white' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='4' fill='white'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <a class="brand" href="https://priyanshu-zihowa.vercel.app"><span class="brand-orb" aria-hidden="true"></span>Priyanshu Zihowa</a>
+    <a class="pill-link" href="https://github.com/hellopanda292/smart-cctv-safety-monitor" target="_blank" rel="noopener noreferrer">View code on GitHub<span class="sr-only"> (opens in a new tab)</span></a>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Computer vision · Public safety · Privacy-first</p>
+      <h1>Smart CCTV <em>Safety Monitor</em></h1>
+      <p class="lead">
+        Detects people, follows each one with an ID, and raises alerts when someone enters a restricted zone,
+        loiters, or a crowd forms. Everything runs in your browser: <strong>the video never leaves your device.</strong>
+      </p>
+    </section>
+
+    <section class="workspace" aria-label="Monitor">
+      <div class="monitor card">
+        <div class="toolbar" role="toolbar" aria-label="Video source">
+          <button type="button" class="btn src active" data-src="demo">Demo video</button>
+          <button type="button" class="btn src" data-src="camera">Use my camera</button>
+          <label class="btn src upload">Upload video<input type="file" id="file" accept="video/*" /></label>
+          <span class="spacer"></span>
+          <button type="button" class="btn" id="pause">Pause</button>
+        </div>
+
+        <div class="screen" id="screen">
+          <canvas id="view" width="854" height="480" aria-label="Video feed with detected people, IDs and the restricted zone"></canvas>
+          <div class="overlay-msg" id="msg">Loading the detection model…</div>
+        </div>
+
+        <div class="zone-bar">
+          <button type="button" class="btn" id="draw-zone" aria-pressed="false">✏️ Draw restricted zone</button>
+          <button type="button" class="btn ghost" id="clear-zone">Clear zone</button>
+          <label class="check"><input type="checkbox" id="privacy" /> Privacy blur</label>
+          <label class="check"><input type="checkbox" id="sound" /> Alert sound</label>
+        </div>
+        <p class="hint" id="hint">Drag on the video to draw a restricted zone. People are checked by where their feet are.</p>
+
+        <div class="rules" role="group" aria-label="Rules">
+          <label class="range-field">
+            <span>Loitering after <output id="loiter-out">3</output> s in the zone</span>
+            <input type="range" id="loiter" min="2" max="20" value="3" />
+          </label>
+          <label class="range-field">
+            <span>Crowd alert at <output id="crowd-out">6</output> people</span>
+            <input type="range" id="crowd" min="2" max="20" value="6" />
+          </label>
+          <label class="range-field">
+            <span>Detection confidence <output id="conf-out">50</output>%</span>
+            <input type="range" id="conf" min="30" max="80" value="50" step="5" />
+          </label>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="card stats" aria-live="polite">
+          <div class="stat"><span class="k">People now</span><strong id="s-now">0</strong></div>
+          <div class="stat"><span class="k">In zone</span><strong id="s-zone">0</strong></div>
+          <div class="stat"><span class="k">Unique people</span><strong id="s-unique">0</strong></div>
+          <div class="stat"><span class="k">Alerts</span><strong id="s-alerts">0</strong></div>
+          <div class="stat wide"><span class="k">Detection speed</span><strong id="s-fps">–</strong></div>
+        </div>
+
+        <div class="card log">
+          <div class="log-head">
+            <h2>Event log</h2>
+            <button type="button" class="btn small" id="export" disabled>Download CSV</button>
+          </div>
+          <ol class="events" id="events" aria-live="polite"></ol>
+          <p class="empty" id="empty">No alerts yet. Draw a zone, or wait for someone to walk into the default one.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="how" aria-labelledby="how-title">
+      <h2 id="how-title">How it works</h2>
+      <ol class="steps">
+        <li><span class="num">1</span><h3>Detect</h3><p>A pretrained <strong>EfficientDet-Lite0</strong> model (MediaPipe) finds people in every frame and returns a box and a confidence score for each.</p></li>
+        <li><span class="num">2</span><h3>Track</h3><p>A tracker I wrote matches each box to the same person in the next frame using <strong>overlap (IoU)</strong> and a <strong>constant-velocity prediction</strong>, so every person keeps one ID.</p></li>
+        <li><span class="num">3</span><h3>Apply rules</h3><p>Each person's <strong>foot point</strong> is tested against the zone polygon (ray casting). Entering triggers an intrusion alert, staying triggers loitering, and too many people triggers a crowd alert.</p></li>
+        <li><span class="num">4</span><h3>Respect privacy</h3><p>No video is uploaded. Turn on <strong>privacy blur</strong> to pixelate everyone, so the system can count and alert without showing faces.</p></li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Built by <a href="https://priyanshu-zihowa.vercel.app">Priyanshu Zihowa</a> · Built with Claude Code</p>
+    <p class="muted small">Demo video: "Video Codec Test pedestrian area" by Taurus Media Technik, CC0, via Wikimedia Commons. Detection model: EfficientDet-Lite0 via Google MediaPipe (Apache 2.0). A student project and prototype, not a certified security product.</p>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
